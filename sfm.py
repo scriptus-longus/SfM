@@ -104,8 +104,8 @@ class SfM(object):
 
 
 if __name__ == '__main__':
-  img1 = cv2.imread('images/viff.003.ppm')
-  img2 = cv2.imread('images/viff.001.ppm')
+  img1 = cv2.imread('viff.003.ppm')
+  img2 = cv2.imread('viff.001.ppm')
 
   H,W, = img1.shape[:2]
 
