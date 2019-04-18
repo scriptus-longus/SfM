@@ -3,8 +3,8 @@ import numpy as np
 import cv2
 
 # read images and create obj sfm
-im1 = cv2.imread('images/viff.003.ppm')
-im2 = cv2.imread('images/viff.001.ppm')
+im1 = cv2.imread('viff.003.ppm')
+im2 = cv2.imread('viff.001.ppm')
 
 # height width
 H,W = im1.shape[:2]
