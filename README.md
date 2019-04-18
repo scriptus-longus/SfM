@@ -17,7 +17,7 @@ small sfm module for python3
   ```
   python3 example.py
   ```
-  [!Screenshot](images/test.png)
+  ![](images/test.png?raw=true)
   
 ## resorces:
   - https://github.com/alyssaq/3Dreconstruction/ (example code)
