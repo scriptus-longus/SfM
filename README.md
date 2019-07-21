@@ -17,6 +17,11 @@ small sfm module for python3
   ```
   python3 example.py
   ```
+  or
+  ```
+  chmod +x example.py
+  ./example.py
+  ```
   ![](images/test.png?raw=true)
   
 ## resorces:
