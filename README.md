@@ -1,13 +1,13 @@
 # SfM
-small sfm module for python3
+This is a small sfm module written in python. 
 
 ## Requirements:
-  - python3  (tested: python 3.5.2)
-  - opencv v.3 (tested 3.4.2)
-  - tested on ubuntu 16.04
+  - python3  (tested: python 3.6.9)
+  - opencv v.3 (tested 4.4.1)
+  - tested on ubuntu 18.04
   
 ## how it works:
-  1. find and match features using SIFT or SHI-TOMASI
+  1. find and match features (SHI-TOM, ORB etc..)
     1.1 normalize coordinates
   2. calculate Essentil Matrix from normalized coordinates
   3. find camera P2 (camera parameters of Second cam)
@@ -23,12 +23,14 @@ small sfm module for python3
   ./example.py
   ```
   ![](images/test.png?raw=true)
-  
-## resorces:
-  - https://github.com/alyssaq/3Dreconstruction/ (example code)
-  - https://github.com/geohot/twitchslam (example code)
-  - https://cmsc426.github.io/sfm/
-  - https://hub.packtpub.com/exploring-structure-motion-using-opencv/
-  - http://www.robots.ox.ac.uk/~vgg/data/data-mview.html
+ 
+## TODO:
+  - automatic calibration (find focal length)
+  - n-views
+  - surfaces
+  - extracting camera position
+ 
+## resources:
+  - Multiple view geometry in computer Vision (Richard Hartley)
   
   
