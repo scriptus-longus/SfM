@@ -1,3 +1,4 @@
+#!/usr/bin/env python3.6
 from __future__ import division 
 import cv2
 import numpy as np
@@ -8,25 +9,6 @@ from camera import Camera
 from helpers import normalizeCoords, recSingPoint, findPose
 from copy import copy
 from scipy.optimize import minimize
-
-
-def findPfromE(E, pts1, pts2):
-    P1 = np.array([[1,0,0,0], [0,1,0,0], [0,0,1,0]])
-
-    posP2 = findPose(E)
-
-    # find correct pose
-    for i, P2 in enumerate(posP2):
-      a1 = recSingPoint(pts1[:,0], pts2[:,0], P1, P2)
-
-      P2hom = np.linalg.inv(np.vstack([P2, [0,0,0,1]]))
-      a2 = np.dot(P2hom[:3, :4], a1)
- 
-      # find best P2
-      if a1[2] > 0 and a2[2] > 0:
-        ret = posP2[i]
-
-    return P1, ret
 
 class SfM(object):
   def __init__(self, cams):
@@ -105,7 +87,7 @@ class SfM(object):
 
     
         # estimate K and E
-        self.f = 3759.0     
+        self.f = 2500.0     
  
         cam1.updateFocal(self.f)  
         cam2.updateFocal(self.f)
@@ -143,17 +125,14 @@ class SfM(object):
         # find coorect pose
         
         P1, P2 = self._findPose(poses, pts1norm, pts2norm)
-        #findPfromE(E, pts1norm, pts2norm)
 
-        self.X = self._triang(pts1norm, pts2norm, P1, P2)    #TODO: append  
+        self.X = self._triang(pts1norm, pts2norm, P1, P2)    #TODO: append features for n-views
         del cam1
         del cam2
 
 
 if __name__ == "__main__":
-  #cams = [Camera("images/viff.001.ppm"), Camera("images/viff.003.ppm")]
   cams = [Camera("images/test01.jpg"), Camera("images/test02.jpg")]
-  #cams = [Camera("images/img03.jpg"), Camera("images/img04.jpg")]
 
   sfm = SfM(cams)
   sfm.run()
