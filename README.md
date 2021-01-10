@@ -22,7 +22,6 @@ This is a small sfm module written in python.
   chmod +x example.py
   ./example.py
   ```
-  ![](images/test.png?raw=true)
  
 ## TODO:
   - automatic calibration (find focal length)
