@@ -10,7 +10,7 @@ This is a small sfm module written in python.
   1. find and match features (SHI-TOM, ORB etc..)
     1.1 normalize coordinates
   2. calculate Essentil Matrix from normalized coordinates
-  3. find camera P2 (camera parameters of Second cam)
+  3. extract Cameras (assume P1 = [diag(1,1,1) | 0])
   5. linear triangulation
 
 ## how to use:
