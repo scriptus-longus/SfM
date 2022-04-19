@@ -10,9 +10,12 @@ from copy import copy
 from scipy.optimize import minimize
 
 class SfM(object):
-  def __init__(self, cams):
+  def __init__(self, cams, focal_length=None):
     self.cams = cams
-    self.f = 2905.88
+    self.f =  1.2* max(self.cams[0].W, self.cmas[0].H)
+    
+    if focal_length != None:
+      self.f = focal_length
 
   def _match(self, c1, c2):
     matches = ft.match(c1.des, c2.des, method="FLANN", _sorted=False, distance=0.75)
