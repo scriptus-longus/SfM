@@ -6,7 +6,6 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import pyplot as plt
 import features as ft
 from camera import Camera
-from helpers import normalizeCoords, recSingPoint, findPose
 from copy import copy
 from scipy.optimize import minimize
 
@@ -60,7 +59,18 @@ class SfM(object):
         return P1, p
 
     print("error could not find correct Pose")
-    return P1, poses[0]  
+    return P1, poses[0] 
+  
+  def _normalizeCoords(self, x):
+    centroid = np.mean(x, axis=0)
+  
+    RMS = np.sqrt(np.mean(np.sum((x-centroid)**2, axis=0 )))
+
+    T = np.array([[np.sqrt(2)/RMS, 0, np.sqrt(2)/RMS*centroid[0]], 
+                 [0, np.sqrt(2)/RMS, np.sqrt(2)/RMS*centroid[0]], 
+                 [0, 0, 1]])
+
+    return x.dot(T[:2, :2]), T
   
   def run(self):
     for i,c in enumerate(cams):
@@ -72,7 +82,7 @@ class SfM(object):
 
         pts1, pts2 = self._match(cam1, cam2)
 
-
+        # normalize coords for 8-point algorithm
         pts1n, Ta = normalizeCoords(pts1)
         pts2n, Tb = normalizeCoords(pts2)
 
@@ -81,7 +91,7 @@ class SfM(object):
         F, _ = cv2.findFundamentalMat(pts1n, pts2n, cv2.FM_RANSAC)
 
         self.F = Tb.T.dot(F).dot(Ta)
-
+        # eliminate outliers
         cam1.pts = pts1[mask.ravel()==1]
         cam2.pts = pts2[mask.ravel()==1]
 
@@ -96,7 +106,7 @@ class SfM(object):
         cam2.updateCoords()
 
         K = cam1.K
-
+        # essential matrix
         E = K.T.dot(self.F).dot(K)
 
         pts1norm = cam1.pts_norm
@@ -132,7 +142,7 @@ class SfM(object):
 
 
 if __name__ == "__main__":
-  cams = [Camera("images/test01.jpg"), Camera("images/test02.jpg")]
+  cams = [Camera("images/viff.001.ppm"), Camera("images/viff.003.ppm")]
 
   sfm = SfM(cams)
   sfm.run()
