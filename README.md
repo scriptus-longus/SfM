@@ -15,12 +15,12 @@ This is a small sfm module written in python.
 
 ## how to use:
   ```
-  python3 example.py
+  python3 sfm.py
   ```
   or
   ```
-  chmod +x example.py
-  ./example.py
+  chmod +x sfm.py
+  ./sfm.py
   ```
  
 ## TODO:
