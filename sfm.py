@@ -1,158 +1,175 @@
-#!/usr/bin/env python3.6
-from __future__ import division 
-import cv2
 import numpy as np
-from mpl_toolkits.mplot3d import Axes3D
-from matplotlib import pyplot as plt
+import cv2
 import features as ft
 from camera import Camera
-from copy import copy
-from scipy.optimize import minimize
+import matplotlib.pyplot as plt
+from scipy.spatial import distance
+from helpers import get_points, PointMap, get_cam_trajectory
 
-class SfM(object):
-  def __init__(self, cams, focal_length=None):
+class SfM:
+  def __init__(self, cams=[]):
     self.cams = cams
-    self.f =  1.2* max(self.cams[0].W, self.cmas[0].H)
-    
-    if focal_length != None:
-      self.f = focal_length
+    self.map = PointMap()
 
-  def _match(self, c1, c2):
-    matches = ft.match(c1.des, c2.des, method="FLANN", _sorted=False, distance=0.75)
+  def match_keypoints(self, cam1, cam2):
+    bf = cv2.BFMatcher()
+    matches = bf.knnMatch(cam1.des, cam2.des, k=2)
+  
+    #good = []
+    pts1 = []
+    pts2 = []
+    for m,n in matches:
+      if m.distance < 0.70*n.distance:
+        pts1.append(list(cam1.kps[m.queryIdx].pt))
+        pts2.append(list(cam2.kps[m.trainIdx].pt))
+        #good.append([m])
 
-    pts1 = np.array([c1.kps[m[0].queryIdx].pt for m in matches], dtype="float64")
-    pts2 = np.array([c2.kps[m[0].trainIdx].pt for m in matches], dtype="float64")
+    pts1 = np.array(pts1)
+    pts2 = np.array(pts2)
     return pts1, pts2
 
-  def _linTriang(self, pt1, pt2, P1, P2):
-    A = np.asarray([(pt1[0]*P1[2] - P1[0]), 
-                    (pt1[1]*P1[2] - P1[1]),
-                    (pt2[0]*P2[2] - P2[0]), 
-                    (pt2[1]*P2[2] - P2[1])])
-    U,S,V = np.linalg.svd(A)
-    return V[-1, :4]
+  def clean_points(self, x):
+    ret = x.copy()
+    indexes = []
+    distance_map = distance.cdist(x, x)
+    mean_dist = np.mean(distance_map)
 
-  def _triang(self, pts1, pts2, P1, P2):
-    ret = np.zeros((pts1.shape[0], 4))
-
-    for i, (pt1, pt2) in enumerate(zip(pts1, pts2)):
-      ret[i] = self._linTriang(pt1, pt2, P1, P2)
-      ret[i] /= ret[i][3]
-    return ret
-
-  def _computeLoss(self, f):
-    K = np.array([[f[0],0,self.W], [0,f[0],self.H], [0,0,1]])
-    E = K.T.dot(self.F).dot(K)
-
-    U,S,V =  np.linalg.svd(E)
-    loss = 0.3* S[0]/S[1]
-    print(S)
-    return loss
-
-  def _findPose(self, poses, x1, x2):
-    P1 = np.eye(3,4)
-
-    for i,p in enumerate(poses):
-      pt = self._triang(x1, x2, P1, p)
-      pt_P1 = np.asarray([x.dot(P1.T) for x in pt])
-      pt_P2 = np.asarray([x.dot(p.T) for x in pt])
-
-
-      if (np.all(pt_P1[:,2] > 0) or np.all(pt_P1[:, 2] < 0)) and (np.all(pt_P1[:,2] > 0) or np.all(pt_P1[:,2] < 0)):
-        return P1, p
-
-    print("error could not find correct Pose")
-    return P1, poses[0] 
-  
-  def _normalizeCoords(self, x):
-    centroid = np.mean(x, axis=0)
-  
-    RMS = np.sqrt(np.mean(np.sum((x-centroid)**2, axis=0 )))
-
-    T = np.array([[np.sqrt(2)/RMS, 0, np.sqrt(2)/RMS*centroid[0]], 
-                 [0, np.sqrt(2)/RMS, np.sqrt(2)/RMS*centroid[0]], 
-                 [0, 0, 1]])
-
-    return x.dot(T[:2, :2]), T
-  
-  def run(self):
-    for i,c in enumerate(cams):
-      if i > 0:
-        cam1 = copy(c)
-        cam2 = copy(cams[i-1])
-
-        self.H, self.W = cam1.img.shape[:2]
-
-        pts1, pts2 = self._match(cam1, cam2)
-
-        # normalize coords for 8-point algorithm
-        pts1n, Ta = normalizeCoords(pts1)
-        pts2n, Tb = normalizeCoords(pts2)
-
-        # find Fundamental Matrix
-        _, mask = cv2.findFundamentalMat(pts1, pts2, cv2.FM_RANSAC)
-        F, _ = cv2.findFundamentalMat(pts1n, pts2n, cv2.FM_RANSAC)
-
-        self.F = Tb.T.dot(F).dot(Ta)
-        # eliminate outliers
-        cam1.pts = pts1[mask.ravel()==1]
-        cam2.pts = pts2[mask.ravel()==1]
-
-    
-        # estimate K and E
-        self.f = 2500.0     
+    for i in range(len(x)):
+      if abs(mean_dist - np.mean(distance_map[i])) > 5:
+        ret = np.delete(ret, i, axis=0)
+        indexes.append(i)
+    return ret, indexes
+     
  
-        cam1.updateFocal(self.f)  
-        cam2.updateFocal(self.f)
+  def two_view_sfm(self, two_cams=None):
+    # detect and match features
+    if len(self.cams) < 2:
+      raise Exception("No images given")
+      
+    if two_cams != None:
+      cam1 = two_cams[0]
+      cam2 = two_cams[1]
+    
+    cam1 = self.cams[0]
+    cam2 = self.cams[1]
 
-        cam1.updateCoords()
-        cam2.updateCoords()
+    # match using SIFT
+    pts1, pts2 = self.match_keypoints(cam1, cam2)
 
-        K = cam1.K
-        # essential matrix
-        E = K.T.dot(self.F).dot(K)
+    F, mask = cv2.findFundamentalMat(pts1, pts2, cv2.FM_RANSAC)
+    pts1 = pts1[mask.ravel()==1]
+    pts2 = pts2[mask.ravel()==1]
 
-        pts1norm = cam1.pts_norm
-        pts2norm = cam2.pts_norm 
+    pts1n = cv2.undistortPoints(np.expand_dims(pts1, axis=1), cameraMatrix=cam1.K, distCoeffs=None)
+    pts2n = cv2.undistortPoints(np.expand_dims(pts2, axis=1), cameraMatrix=cam2.K, distCoeffs=None)
+    
 
-        # extract pose
-        U,S,V = np.linalg.svd(E)
+    E = cam2.K.T @ F @ cam1.K
 
-        W = np.array([[0,-1,0], [1,0,0], [0,0,1]])
+    _, R, t, mask = cv2.recoverPose(E, pts1n, pts2n)
+
+    cam2.P = np.hstack((R, t))
+
+    X = cv2.triangulatePoints(cam1.P, cam2.P, pts1n, pts2n)
+    X /= X[3]
+
+    return pts1, pts2, X[:3].T
+
+  def run(self):
+    camera_positions = [np.array([0,0,0])]
+    if len(self.cams) < 2:
+      raise Exception("No images given")
+ 
+    self.cams[0].pts, self.cams[1].pts, pts3d = self.two_view_sfm()
+    pts3d, indexes = self.clean_points(pts3d)
+    for i in indexes:
+      self.cams[0].pts = np.delete(self.cams[0].pts, i, axis=0)
+      self.cams[1].pts = np.delete(self.cams[1].pts, i, axis=0)
+    assoc_3d_points = [pts3d]
+
+    camera_positions.append(self.cams[1].P[:, 3:].reshape(3) + camera_positions[-1])
+    #self.cams[1].position = self.cams[0].position + self.cams[1].P[:, 3:].reshape(3)
+
+    print(self.cams[0].pts.shape)
+    print(pts3d.shape)
+
+    self.map.add_points(self.cams[0].pts, pts3d)
+    self.map.add_points(self.cams[1].pts, pts3d)
+    print(self.map.all_3d_points)
+
+    for i in range(2, len(self.cams)):
+      cam1 = self.cams[i-1]
+      cam2 = self.cams[i]
+
+      pts1, pts2 = self.match_keypoints(cam1, cam2) 
+  
+      F, mask = cv2.findFundamentalMat(pts1, pts2, cv2.FM_RANSAC)
+      pts1 = pts1[mask.ravel() == 1]
+      pts2 = pts2[mask.ravel() == 1]
+
+      pts3d, mask = self.map.get_points(pts1)
+      mask = np.array(mask)
+
+      old_pts = pts2[mask==1]
+
+      new_pts1 = pts1[mask==0]
+      new_pts2 = pts2[mask==0]
+
+      new_pts1n = cv2.undistortPoints(np.expand_dims(new_pts1, axis=1), cameraMatrix=cam1.K, distCoeffs=None)
+      new_pts2n = cv2.undistortPoints(np.expand_dims(new_pts2, axis=1), cameraMatrix=cam2.K, distCoeffs=None)
+ 
+
+      _, R, t, _ = cv2.solvePnPRansac(pts3d, old_pts, cam1.K, None)
+      R, _ = cv2.Rodrigues(R)
+ 
+      cam2.P =np.hstack((R, t))
+
+      X = cv2.triangulatePoints(cam1.P, cam2.P, new_pts1n, new_pts2n)
+      X /= X[3]
+
+      X = X[:3].T
+
+      X, indexes = self.clean_points(X)
+      for i in indexes:
+        pts1 = np.delete(pts1, i, axis=0)        
+        pts2 = np.delete(pts2, i, axis=0)        
+
+      cam1.pts = pts1
+      cam2.pts = pts2
 
 
-        R1 = np.dot(np.dot(U, W), V)
-        R2 = np.dot(np.dot(U, W.T), V)
+      assoc_3d_points.append(X)
+      camera_positions.append(cam2.P[:, 3:].reshape(3) + camera_positions[-1])
+      #cam2.position = cam1.position + cam2.P[:, 3:].reshape(3)
 
-        if np.linalg.det(R1) < 0:
-          R1 = -1*R1
-        if np.linalg.det(R2) < 0:
-          R2 = -1*R2
+      self.map.add_points(new_pts1, X)  
+      self.map.add_points(new_pts2, X)  
+    
 
-
-        poses = np.array([np.hstack((R1,  U[:, 2].reshape(3,1))),
-                          np.hstack((R1, -U[:, 2].reshape(3,1))),
-                          np.hstack((R2,  U[:, 2].reshape(3,1))),
-                          np.hstack((R2, -U[:, 2].reshape(3,1)))])
-
-        # find coorect pose
-        
-        P1, P2 = self._findPose(poses, pts1norm, pts2norm)
-
-        self.X = self._triang(pts1norm, pts2norm, P1, P2)    #TODO: append features for n-views
-        del cam1
-        del cam2
-
+    return self.map, np.vstack(camera_positions) #np.vstack(camera_positions) #np.array(self.mem.all_3d_points), np.vstack(camera_positions)
 
 if __name__ == "__main__":
-  cams = [Camera("images/viff.001.ppm"), Camera("images/viff.003.ppm")]
+  cams = [Camera("images/images_castle/100_7101.JPG"), 
+          Camera("images/images_castle/100_7103.JPG"), 
+          Camera("images/images_castle/100_7104.JPG"), 
+          Camera("images/images_castle/100_7105.JPG"), 
+          Camera("images/images_castle/100_7106.JPG")] 
+          #Camera("images/images_castle/100_7107.JPG")] 
+  
 
-  sfm = SfM(cams)
-  sfm.run()
+  sfm = SfM(cams=cams)
+  point_map, cam_coords = sfm.run()   
+
+  points = get_points(point_map) 
+  #cam_coords = get_cam_trajectory(cams)
 
   fig = plt.figure()
-  ax = fig.add_subplot(111, projection='3d')
   
-  ax.scatter(sfm.X[:, 0], sfm.X[:, 1], sfm.X[:, 2])
-  plt.show()
+  ax =fig.add_subplot(111, projection="3d")
+  ax.set_xlim3d(-3, 3)
+  ax.set_zlim3d(0, 5)
+  ax.set_ylim3d(-3,3) 
  
+  ax.scatter(points[:, 0], points[:, 1], points[:, 2], color="blue")
+  ax.scatter(cam_coords[:, 0], cam_coords[:, 1], cam_coords[:, 2], color="green")
+  plt.show()
