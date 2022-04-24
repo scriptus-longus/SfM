@@ -9,23 +9,27 @@ def detect(img, method="ORB", nMax=50000, quality=0.01, distance=5):
   if method == "ORB":
     kps = orb.detect(gray, None)
     kps, des = orb.compute(gray, kps)
-
-    return kps, des
     
-  if method == "FAST":
+  elif method == "FAST":
     fast = cv2.FastFeatureDetector_create()
 
     kps = fast.detect(gray, None)
     kps, des = orb.compute(gray, kps)
-    return kps, des
 
-  if method == "SHI-TOM":
+  elif method == "SHI-TOM":
     kps = cv2.goodFeaturesToTrack(gray, nMax, quality, distance)
-    kps = [cv2.KeyPoint(x=p[0][0], y=p[0][1], _size=10) for p in kps]
+    kps = [cv2.KeyPoint(x=p[0][0], y=p[0][1], size=10) for p in kps]
 
     kps, des = orb.compute(gray, kps)
-    return kps, des
 
+  elif method == "SIFT":
+    sift = cv2.SIFT_create()
+
+    kps, des = sift.detectAndCompute(img, None)     
+  else:
+    raise Exception("Invalid feature detection method")
+
+  return kps, des
 
 def match(des1, des2, method="BF", _sorted=False, distance=None):
   #gray = img.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -41,10 +45,8 @@ def match(des1, des2, method="BF", _sorted=False, distance=None):
     if distance != None and abs(distance) <= 1:
       idx = int(round(len(matches)*abs(distance))) 
       matches = matches[:idx]
- 
-    return matches
 
-  if method == "FLANN":
+  elif method == "FLANN":
     index_params = dict(algorithm=6, table_number=6, key_size=12, multi_probe_level=1)
 
     search_params = dict(checks=80)
@@ -60,8 +62,8 @@ def match(des1, des2, method="BF", _sorted=False, distance=None):
         if m.distance < distance*n.distance:
           matches_good.append([m,n])
       matches = matches_good
-    return matches
  
+  return matches
 
 def detectAndMatch(img1, img2, features="ORB", matching="BF", nMax=50000, _sorted=False, quality=0.01, distanceDet=5, distanceMat=None):
   kps1, des1 = detect(img1, method=features, nMax=nMax, distance=distanceDet)
