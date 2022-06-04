@@ -5,7 +5,7 @@ import features as ft
 #from helpers import normalizeCoords
 
 class Camera(object):
-  def __init__(self, img):
+  def __init__(self, img: str):
     self.path = img
     self.img = cv2.imread(img)
     self.H, self.W = self.img.shape[:2]
